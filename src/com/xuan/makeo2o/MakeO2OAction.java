@@ -61,6 +61,8 @@ public class MakeO2OAction extends AnAction {
             return;
         }
         List<PsiField> paramentFieldList = new CollectionListModel<>(paramentClass.getFields()).getItems();
+
+
         String methodText = buildCode(methodName, returnClassName, psiParameter, paramentFieldList);
         PsiElementFactory elementFactory = JavaPsiFacade.getElementFactory(psiMethod.getProject());
         PsiMethod toMethod = elementFactory.createMethodFromText(methodText, psiMethod);
