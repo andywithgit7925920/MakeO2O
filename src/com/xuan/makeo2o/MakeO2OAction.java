@@ -11,7 +11,9 @@ import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.ui.CollectionListModel;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Click MakeO2O Action.
@@ -56,17 +58,30 @@ public class MakeO2OAction extends AnAction {
         String parameterClassWithPackage = psiParameter.getType().getInternalCanonicalText();
         //To parse the field, need to load the class of the parameter here
         JavaPsiFacade facade = JavaPsiFacade.getInstance(psiMethod.getProject());
-        PsiClass paramentClass = facade.findClass(parameterClassWithPackage, GlobalSearchScope.allScope(psiMethod.getProject()));
+        PsiClass paramentClass = facade.findClass(parameterClassWithPackage,
+            GlobalSearchScope.allScope(psiMethod.getProject()));
         if (null == paramentClass) {
             return;
         }
-        List<PsiField> paramentFieldList = new CollectionListModel<>(paramentClass.getFields()).getItems();
 
+        List<PsiField> paramentFieldList = getAllParamentFieldList(paramentClass);
 
         String methodText = buildCode(methodName, returnClassName, psiParameter, paramentFieldList);
         PsiElementFactory elementFactory = JavaPsiFacade.getElementFactory(psiMethod.getProject());
         PsiMethod toMethod = elementFactory.createMethodFromText(methodText, psiMethod);
         psiMethod.replace(toMethod);
+    }
+
+    private List<PsiField> getAllParamentFieldList(PsiClass paramentClass) {
+
+        List<PsiField> paramentFieldList = new ArrayList<>();
+
+        while (Objects.nonNull(paramentClass.getSuperClass())) {
+            paramentFieldList.addAll(new CollectionListModel<>(paramentClass.getFields()).getItems());
+            paramentClass = paramentClass.getSuperClass();
+        }
+
+        return paramentFieldList;
     }
 
     /**
@@ -79,62 +94,61 @@ public class MakeO2OAction extends AnAction {
      * @return code
      */
     private String buildCode(String methodName,
-                             String returnClassName,
-                             PsiParameter psiParameter,
-                             List<PsiField> paramentFieldList) {
+        String returnClassName,
+        PsiParameter psiParameter,
+        List<PsiField> paramentFieldList) {
         String returnObjName = returnClassName.substring(0, 1).toLowerCase() + returnClassName.substring(1);
         String parameterClass = psiParameter.getText();
         String parameterName = psiParameter.getName();
-
 
         //code builder
         StringBuilder builder = new StringBuilder();
 
         // method name
         builder
-                .append("public static ")
-                .append(returnClassName)
-                .append(" ").append(methodName)
-                .append(" (")
-                .append(parameterClass)
-                .append(" ) {\n");
+            .append("public static ")
+            .append(returnClassName)
+            .append(" ").append(methodName)
+            .append(" (")
+            .append(parameterClass)
+            .append(" ) {\n");
 
         //if null code
         builder.append("if ( ")
-                .append(parameterName)
-                .append("== null ){\n")
-                .append("return null;\n}")
-                .append(returnClassName)
-                .append(" ")
-                .append(returnObjName)
-                .append("= new ")
-                .append(returnClassName)
-                .append("();\n");
+            .append(parameterName)
+            .append("== null ){\n")
+            .append("return null;\n}")
+            .append(returnClassName)
+            .append(" ")
+            .append(returnObjName)
+            .append("= new ")
+            .append(returnClassName)
+            .append("();\n");
 
         for (PsiField field : paramentFieldList) {
             PsiModifierList modifierList = field.getModifierList();
             if (null == modifierList
-                    || modifierList.hasModifierProperty(PsiModifier.STATIC)
-                    || modifierList.hasModifierProperty(PsiModifier.FINAL)
-                    || modifierList.hasModifierProperty(PsiModifier.SYNCHRONIZED)
-                    || null == field.getName()) {
+                || modifierList.hasModifierProperty(PsiModifier.STATIC)
+                || modifierList.hasModifierProperty(PsiModifier.FINAL)
+                || modifierList.hasModifierProperty(PsiModifier.SYNCHRONIZED)
+                || null == field.getName()) {
                 continue;
             }
             //set get code
             builder.append(returnObjName)
-                    .append(".set")
-                    .append(getFirstUpperCase(field.getName()))
-                    .append("(")
-                    .append(parameterName)
-                    .append(".get")
-                    .append(getFirstUpperCase(field.getName()))
-                    .append("());\n");
+                .append(".set")
+                .append(getFirstUpperCase(field.getName()))
+                .append("(")
+                .append(parameterName)
+                .append(".get")
+                .append(getFirstUpperCase(field.getName()))
+                .append("());\n");
         }
 
         //return code
         builder.append("return ")
-                .append(returnObjName)
-                .append(";\n");
+            .append(returnObjName)
+            .append(";\n");
 
         builder.append("}\n");
         return builder.toString();
